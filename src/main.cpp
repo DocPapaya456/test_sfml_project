@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <math.h>
+#include <vector>
+#include <iostream>
 
 
 class Ball {
@@ -23,7 +25,7 @@ public:
     }
 
     void update(const sf::RenderWindow& window) {
-        if (position.x >= window.getSize().x - this->radius) {
+        if (position.x >= window.getSize().x - radius) {
             position.x = window.getSize().x - radius;
             direction.x = -direction.x;
             setColour(sf::Color(rand() % 256, rand() % 256, rand() % 256));
@@ -104,11 +106,14 @@ int main()
     auto window = sf::RenderWindow(sf::VideoMode({1280u, 720u}), "Bouncy Ball");
     window.setFramerateLimit(144);
 
-    RandomBall balls[3] = { RandomBall(sf::Vector2f{ window.getSize() / 2u }), RandomBall(sf::Vector2f{ window.getSize() / 2u }) , RandomBall(sf::Vector2f{ window.getSize() / 2u }) };
+    std::vector<RandomBall> balls;
+    balls.push_back(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
 
     bool plusPressed = false;
     bool minusPressed = false;
     bool cPressed = false;
+    bool enterPressed = false;
+    bool backspacePressed = false;
 
     while (window.isOpen())
     {
@@ -137,10 +142,32 @@ int main()
             position.y += speed;
         }*/
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Add)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Backspace)) {
+            if (!backspacePressed) {
+                if (!balls.empty()) {
+                    balls.pop_back();
+                }
+                backspacePressed = true;
+            }
+        }
+        else {
+            backspacePressed = false;
+        }
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter)) {
+            if (!enterPressed) {
+                balls.push_back(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
+                enterPressed = true;
+            }
+        }
+        else {
+            enterPressed = false;
+        }
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Equal)) {
             if (!plusPressed) {
-                for (int i = 0; i < sizeof(balls) / sizeof(balls[0]); i++) {
-                    balls[i].setVelocity(balls[i].getVelocity() * 1.25);
+                for (RandomBall& ball : balls) {
+                    ball.setVelocity(ball.getVelocity() * 1.25);
                 }
                 plusPressed = true;
             }
@@ -150,10 +177,10 @@ int main()
         }
         
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Subtract)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Hyphen)) {
             if (!minusPressed) {
-                for (int i = 0; i < sizeof(balls) / sizeof(balls[0]); i++) {
-                    balls[i].setVelocity(balls[i].getVelocity() * 0.8);
+                for (RandomBall& ball : balls) {
+                    ball.setVelocity(ball.getVelocity() * 0.8);
                 }
                 minusPressed = true;
             }
@@ -164,9 +191,9 @@ int main()
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
             if (!cPressed) {
-                for (int i = 0; i < sizeof(balls) / sizeof(balls[0]); i++) {
+                for (RandomBall& ball : balls) {
                     int randAngle = rand() % 360;
-                    balls[i].setDirection(sf::Vector2f{cos(randAngle * float(M_PI) / 180) , sin(randAngle * float(M_PI) / 180)});
+                    ball.setDirection(sf::Vector2f{cos(randAngle * float(M_PI) / 180) , sin(randAngle * float(M_PI) / 180)});
                 }
                 cPressed = true;
             }
@@ -176,16 +203,16 @@ int main()
         }
 
 
-        for (int i = 0; i < sizeof(balls) / sizeof(balls[0]); i++) {
-            balls[i].update(window);
+        for (RandomBall& ball : balls) {
+            ball.update(window);
         }
 
         window.clear();
 
         // Draw stuff here
         
-        for (int i = 0; i < sizeof(balls) / sizeof(balls[0]); i++) {
-            balls[i].draw(window);
+        for (RandomBall& ball : balls) {
+            ball.draw(window);
         }
 
         window.display();
