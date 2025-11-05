@@ -1,4 +1,5 @@
 #define _USE_MATH_DEFINES
+#define MAX_VEL 50.0f
 
 #include <SFML/Graphics.hpp>
 #include <cstdlib>
@@ -6,6 +7,7 @@
 #include <math.h>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
 
 class Ball {
@@ -28,25 +30,25 @@ public:
         if (position.x >= window.getSize().x - radius) {
             position.x = window.getSize().x - radius;
             direction.x = -direction.x;
-            setColour(sf::Color(rand() % 256, rand() % 256, rand() % 256));
+            setColour(sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256));
         }
 
         if (position.x <= radius) {
             position.x = radius;
             direction.x = -direction.x;
-            setColour(sf::Color(rand() % 256, rand() % 256, rand() % 256));
+            setColour(sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256));
         }
 
         if (position.y >= window.getSize().y - radius) {
             position.y = window.getSize().y - radius;
             direction.y = -direction.y;
-            setColour(sf::Color(rand() % 256, rand() % 256, rand() % 256));
+            setColour(sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256));
         }
 
         if (position.y <= radius) {
             position.y = radius;
             direction.y = -direction.y;
-            setColour(sf::Color(rand() % 256, rand() % 256, rand() % 256));
+            setColour(sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256));
         }
 
         position += velocity * direction;
@@ -57,6 +59,10 @@ public:
         shape.setFillColor(colour);
     }
 
+    sf::Vector2f getDirection() {
+        return direction;
+    }
+
     void setDirection(sf::Vector2f direction) {
         this->direction = direction.normalized();
     }
@@ -65,8 +71,21 @@ public:
         return velocity;
     }
 
+
     void setVelocity(float velocity) {
-        this->velocity = velocity;
+        this->velocity = std::min(velocity, MAX_VEL);
+    }
+
+    sf::Vector2f getPosition() {
+        return position;
+    }
+
+    void setPosition(sf::Vector2f position) {
+        this->position = position;
+    }
+
+    float getRadius() {
+        return radius;
     }
 
     void draw(sf::RenderWindow& window) {
@@ -80,21 +99,122 @@ public:
 
 private:
     sf::Vector2f randomDirection() {
-        int randAngle = rand() % 360;
+        int randAngle = std::rand() % 360;
         return sf::Vector2f{ cos(randAngle * float(M_PI) / 180) , sin(randAngle * float(M_PI) / 180) };
     }
     
     float randomVelocity() {
-        return static_cast<float>(rand() % 4 + 1);
+        return static_cast<float>(std::rand() % 4 + 1);
     }
 
     float randomRadius() {
-        return static_cast<float>(rand() % 100 + 1);
+        return static_cast<float>(std::rand() % 100 + 1);
     }
 
     sf::Color randomColour() {
-        return sf::Color(rand() % 256, rand() % 256, rand() % 256);
+        return sf::Color(std::rand() % 256, std::rand() % 256, std::rand() % 256);
     }
+
+};
+
+class BallManager {
+private:
+    std::vector<Ball> balls;
+
+    void calculateCollisions() {
+        for (int i = 0; i < balls.size(); i++) {
+            for (int j = i + 1; j < balls.size(); j++) {
+                Ball& a = balls.at(i);
+                Ball& b = balls.at(j);
+                if ( isColliding( a, b ) ) {
+                    // Vector formed from the centers of the two balls
+                    sf::Vector2f v_ab = a.getPosition() - b.getPosition();
+
+                    // Force vectors of movement of A and B
+                    sf::Vector2f F_a = a.getVelocity() * a.getDirection();
+                    sf::Vector2f F_b = b.getVelocity() * b.getDirection();
+
+                    // Ball A
+                    // Orthogonal projection
+                    sf::Vector2f force_b_on_a = F_b.projectedOnto(v_ab);
+                    sf::Vector2f resultant_a = F_a + force_b_on_a;
+                    a.setVelocity(resultant_a.length());
+                    a.setDirection(resultant_a.normalized());
+
+                    // Ball B
+                    // Orthogonal projection
+                    sf::Vector2f force_a_on_b = F_a.projectedOnto(v_ab);
+                    sf::Vector2f resultant_b = F_b + force_a_on_b;
+                    b.setVelocity(resultant_b.length());
+                    b.setDirection(resultant_b.normalized());
+
+
+                }
+            }
+        }
+    }
+
+    bool isColliding(Ball& a, Ball& b) {
+        // Vector between two centers
+        sf::Vector2f v = b.getPosition() - a.getPosition();
+
+        float minDistance = a.getRadius() + b.getRadius();
+
+        if (v.length() < minDistance) {
+            b.setPosition(b.getPosition() + v.normalized() * (minDistance - v.length()));
+            return true;
+        }
+        return false;
+    }
+
+public:
+    void addBall(Ball& ball) {
+        balls.push_back(ball);
+    }
+
+    void removeBall() {
+        balls.pop_back();
+    }
+
+    bool empty() {
+        return balls.empty();
+    }
+
+    void increaseBallsVelocity(float amount) {
+        for (Ball& ball : balls) {
+            ball.setVelocity(ball.getVelocity() * amount);
+        }
+    }
+
+    void decreaseBallsVelocity(float amount) {
+        for (Ball& ball : balls) {
+            ball.setVelocity(ball.getVelocity() * amount);
+        }
+    }
+
+    void randomiseBallsDirection() {
+        for (Ball& ball : balls) {
+            int randAngle = std::rand() % 360;
+            ball.setDirection(sf::Vector2f{ cos(randAngle * float(M_PI) / 180) , sin(randAngle * float(M_PI) / 180) });
+        }
+    }
+
+    void updateBalls(sf::RenderWindow& window) {
+
+        calculateCollisions();
+
+        for (Ball& ball : balls) {
+            ball.update(window);
+        }
+
+    }
+
+    void drawBalls(sf::RenderWindow& window) {
+        for (Ball& ball : balls) {
+            ball.draw(window);
+        }
+    }
+
 
 };
 
@@ -106,8 +226,8 @@ int main()
     auto window = sf::RenderWindow(sf::VideoMode({1280u, 720u}), "Bouncy Ball");
     window.setFramerateLimit(144);
 
-    std::vector<RandomBall> balls;
-    balls.push_back(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
+    BallManager ballManager;
+    ballManager.addBall(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
 
     bool plusPressed = false;
     bool minusPressed = false;
@@ -125,27 +245,10 @@ int main()
             }
         }
 
-
-        /*if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
-            position.x -= speed;
-        }
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
-            position.x += speed;
-        }
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
-            position.y -= speed;
-        }
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
-            position.y += speed;
-        }*/
-
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Backspace)) {
             if (!backspacePressed) {
-                if (!balls.empty()) {
-                    balls.pop_back();
+                if (!ballManager.empty()) {
+                    ballManager.removeBall();
                 }
                 backspacePressed = true;
             }
@@ -156,7 +259,7 @@ int main()
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter)) {
             if (!enterPressed) {
-                balls.push_back(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
+                ballManager.addBall(RandomBall(sf::Vector2f{ window.getSize() / 2u }));
                 enterPressed = true;
             }
         }
@@ -166,9 +269,7 @@ int main()
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Equal)) {
             if (!plusPressed) {
-                for (RandomBall& ball : balls) {
-                    ball.setVelocity(ball.getVelocity() * 1.25);
-                }
+                ballManager.increaseBallsVelocity(1.25f);
                 plusPressed = true;
             }
         }
@@ -179,9 +280,7 @@ int main()
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Hyphen)) {
             if (!minusPressed) {
-                for (RandomBall& ball : balls) {
-                    ball.setVelocity(ball.getVelocity() * 0.8);
-                }
+                ballManager.decreaseBallsVelocity(0.8f);
                 minusPressed = true;
             }
         }
@@ -191,10 +290,7 @@ int main()
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
             if (!cPressed) {
-                for (RandomBall& ball : balls) {
-                    int randAngle = rand() % 360;
-                    ball.setDirection(sf::Vector2f{cos(randAngle * float(M_PI) / 180) , sin(randAngle * float(M_PI) / 180)});
-                }
+                ballManager.randomiseBallsDirection();
                 cPressed = true;
             }
         }
@@ -203,17 +299,13 @@ int main()
         }
 
 
-        for (RandomBall& ball : balls) {
-            ball.update(window);
-        }
+        ballManager.updateBalls(window);
 
         window.clear();
 
         // Draw stuff here
         
-        for (RandomBall& ball : balls) {
-            ball.draw(window);
-        }
+        ballManager.drawBalls(window);
 
         window.display();
     }
